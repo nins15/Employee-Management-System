@@ -1,0 +1,51 @@
+image: alpine:latest
+
+before_script:
+  - mkdir -p ~/.ssh
+  - echo "$DEPLOY_SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+  - chmod 700 ~/.ssh/id_rsa
+  - eval "$(ssh-agent -s)"
+  - ssh-add ~/.ssh/id_rsa
+  - ssh-keyscan -H 'gitlab.com' >> ~/.ssh/known_hosts
+
+stages:
+  - build
+  - test
+  - deploy
+  
+build:
+  image: maven:latest
+  stage: build
+  script:
+    - mvn clean install
+  artifacts:
+    paths:
+      - /home/gitlab-runner/builds/L8nssw4e/0/courses/2021-summer/csci-5308/group-14/target/
+  tags:
+    - ugrad
+
+test:
+  image: maven:latest
+  stage: test
+  script:
+    - mvn test
+  tags:
+    - ugrad
+
+
+deployStage:
+  stage: deploy
+  tags:
+    - ugrad
+  artifacts:
+    paths:
+      - /home/gitlab-runner/builds/L8nssw4e/0/courses/2021-summer/csci-5308/group-14/target/
+  script:
+    
+    - ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir ${DEPLOY_DIR}/${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}"
+    - scp -r -o StrictHostKeyChecking=no /home/gitlab-runner/builds/L8nssw4e/0/courses/2021-summer/csci-5308/group-14/target/EMS-1.0-SNAPSHOT.jar "${DEPLOY_USER}@${DEPLOY_HOST}:~/${DEPLOY_DIR}/${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}/${CI_COMMIT_REF_NAME}${CI_COMMIT_SHORT_SHA}.jar"
+
+  environment:
+    name: Production
+  only:
+    - master
